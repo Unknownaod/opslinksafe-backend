@@ -5,6 +5,7 @@ import { User } from "../models/User.js";
 import { Agency } from "../models/Agency.js";
 import { hashPassword, comparePassword, signJwt } from "../utils/crypto.js";
 import { badRequest, unauthorized } from "../utils/httpErrors.js";
+import mongoose from "mongoose";
 
 export const authRoutes = Router();
 
@@ -16,16 +17,37 @@ const loginSchema = z.object({
   password: z.string().min(6)
 });
 
-// ✅ POST /api/auth/login
 authRoutes.post("/login", validateBody(loginSchema), async (req, res, next) => {
   try {
     const { username, password } = req.validatedBody;
 
+    // 🔍 DB debug
+    console.log("✅ Connected DB name:", mongoose.connection.name);
+
     const user = await User.findOne({ username }).populate("agency");
-    if (!user || !user.active) throw unauthorized("Invalid credentials");
+
+    if (!user) {
+      console.warn("⚠️ No user found for username:", username);
+      throw unauthorized("Invalid credentials");
+    }
+
+    console.log("🧩 Found user:", user.username);
+    console.log("🧩 User hash:", user.passwordHash);
+    console.log("🧩 Incoming password:", password);
 
     const ok = await comparePassword(password, user.passwordHash);
-    if (!ok) throw unauthorized("Invalid credentials");
+
+    console.log("🧩 Password match result:", ok);
+
+    if (!user.active) {
+      console.warn("⚠️ User inactive:", username);
+      throw unauthorized("Invalid credentials");
+    }
+
+    if (!ok) {
+      console.warn("⚠️ Password mismatch for:", username);
+      throw unauthorized("Invalid credentials");
+    }
 
     const token = signJwt({
       sub: user._id.toString(),
@@ -53,7 +75,6 @@ authRoutes.post("/login", validateBody(loginSchema), async (req, res, next) => {
   }
 });
 
-
 // =======================================
 // 🧱 BOOTSTRAP ADMIN ROUTE (DEV ONLY)
 // =======================================
@@ -65,33 +86,24 @@ const bootstrapSchema = z.object({
   password: z.string().min(8)
 });
 
-// ✅ POST /api/auth/bootstrap
 authRoutes.post("/bootstrap", validateBody(bootstrapSchema), async (req, res, next) => {
   try {
-    // Protect this route in production
     if (process.env.NODE_ENV === "production") {
       throw badRequest("Bootstrap disabled in production");
     }
 
     const { agencyName, agencyCode, username, displayName, password } = req.validatedBody;
 
-    // Check or create agency
     let agency = await Agency.findOne({ code: agencyCode });
     if (!agency) {
-      agency = await Agency.create({
-        name: agencyName,
-        code: agencyCode,
-      });
+      agency = await Agency.create({ name: agencyName, code: agencyCode });
     }
 
-    // Check for existing user
     const existingUser = await User.findOne({ username });
     if (existingUser) throw badRequest("Username already exists");
 
-    // Hash password
     const passwordHash = await hashPassword(password);
 
-    // Create admin user
     const user = await User.create({
       agency: agency._id,
       username,
@@ -104,17 +116,8 @@ authRoutes.post("/bootstrap", validateBody(bootstrapSchema), async (req, res, ne
     res.json({
       ok: true,
       message: "✅ Bootstrap admin created successfully",
-      agency: {
-        id: agency._id,
-        name: agency.name,
-        code: agency.code
-      },
-      user: {
-        id: user._id,
-        username: user.username,
-        displayName: user.displayName,
-        role: user.role
-      }
+      agency: { id: agency._id, name: agency.name, code: agency.code },
+      user: { id: user._id, username: user.username, displayName: user.displayName, role: user.role }
     });
   } catch (err) {
     next(err);
