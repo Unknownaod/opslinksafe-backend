@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import connectDB from "./db/mongo.js";
+import { connectMongo } from "./db/mongo.js";
 import { notFoundHandler, errorHandler } from "./middleware/errorHandler.js";
 
 dotenv.config();
