@@ -5,13 +5,13 @@ import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 
-import authRoutes from "./routes/authRoutes.js";
-import incidentRoutes from "./routes/incidentRoutes.js";
-import unitRoutes from "./routes/unitRoutes.js";
-import activityRoutes from "./routes/activityRoutes.js";
-import healthRoutes from "./routes/healthRoutes.js";
-import { notFoundHandler, errorHandler } from "./middleware/errorHandler.js";
-import connectDB from "./db/mongo.js";
+import authRoutes from "/routes/authRoutes.js";
+import incidentRoutes from "/routes/incidentRoutes.js";
+import unitRoutes from "/routes/unitRoutes.js";
+import activityRoutes from "/routes/activityRoutes.js";
+import healthRoutes from "/routes/healthRoutes.js";
+import { notFoundHandler, errorHandler } from "/middleware/errorHandler.js";
+import connectDB from "/db/mongo.js";
 
 dotenv.config();
 
