@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt"; // ✅ not bcryptjs
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 
