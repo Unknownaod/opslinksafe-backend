@@ -10,11 +10,11 @@ import { notFoundHandler, errorHandler } from "./middleware/errorHandler.js";
 // ==========================
 // 🔥 FIRE / EMS CAD ROUTES
 // ==========================
-import authRoutes from "./routes/authRoutes.js";          // Authentication & session
-import incidentRoutes from "./routes/incidentRoutes.js";  // Dispatch / 911 calls
-import unitRoutes from "./routes/unitRoutes.js";          // Active units / apparatus
-import activityRoutes from "./routes/activityRoutes.js";  // Call activity / logs
-import healthRoutes from "./routes/healthRoutes.js";      // System status
+import authRoutes from "./routes/authRoutes.js";
+import incidentRoutes from "./routes/IncidentRoutes.js";  // <-- Capital I
+import unitRoutes from "./routes/unitRoutes.js";
+import activityRoutes from "./routes/activityRoutes.js";
+import healthRoutes from "./routes/healthRoutes.js";
 
 // ==========================
 // 🌐 INITIALIZATION
@@ -38,7 +38,7 @@ app.use(morgan("combined"));
 // ==========================
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 120,            // 120 requests per IP per minute
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
 });
