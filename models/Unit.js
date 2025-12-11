@@ -1,19 +1,26 @@
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema(
+const unitSchema = new mongoose.Schema(
   {
     agency: { type: mongoose.Schema.Types.ObjectId, ref: "Agency", required: true },
-    username: { type: String, required: true, unique: true },
-    displayName: { type: String, required: true },
-    passwordHash: { type: String, required: true },
-    role: {
+    unitId: { type: String, required: true, unique: true },
+    callsign: { type: String, required: true },
+    type: {
       type: String,
-      enum: ["DISPATCHER", "FIELD", "SUPERVISOR", "ADMIN"],
+      enum: ["ENGINE", "LADDER", "RESCUE", "AMBULANCE", "COMMAND"],
       required: true
     },
-    active: { type: Boolean, default: true }
+    status: {
+      type: String,
+      enum: ["AVAILABLE", "EN_ROUTE", "ON_SCENE", "RETURNING", "OUT_OF_SERVICE"],
+      default: "AVAILABLE"
+    },
+    assignedIncident: { type: mongoose.Schema.Types.ObjectId, ref: "Incident" },
+    location: { type: String },
+    personnel: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }]
   },
   { timestamps: true }
 );
 
-export const User = mongoose.model("User", userSchema);
+// ✅ Make sure the model name is "Unit" (not "User")
+export const Unit = mongoose.models.Unit || mongoose.model("Unit", unitSchema);
