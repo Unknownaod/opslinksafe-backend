@@ -11,7 +11,7 @@ import { notFoundHandler, errorHandler } from "./middleware/errorHandler.js";
 // 🔥 FIRE / EMS CAD ROUTES
 // ==========================
 import authRoutes from "./routes/authRoutes.js";
-import incidentRoutes from "./routes/IncidentRoutes.js";  // <-- Capital I
+import incidentRoutes from "./routes/IncidentRoutes.js";  // Capital “I”
 import unitRoutes from "./routes/unitRoutes.js";
 import activityRoutes from "./routes/activityRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
@@ -25,7 +25,7 @@ connectDB();
 const app = express();
 
 // ==========================
-// ⚙️ MIDDLEWARE
+// ⚙️ SECURITY & MIDDLEWARE
 // ==========================
 app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
@@ -38,14 +38,14 @@ app.use(morgan("combined"));
 // ==========================
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 120,
+  max: 120,            // Limit each IP to 120 requests/minute
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use(limiter);
 
 // ==========================
-// 🚑 ROUTES
+// 🚑 API ROUTES
 // ==========================
 app.use("/api/auth", authRoutes);
 app.use("/api/incidents", incidentRoutes);
