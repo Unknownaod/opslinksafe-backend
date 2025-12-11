@@ -22,7 +22,6 @@ const __dirname = path.dirname(__filename);
 // 🧠 INITIALIZE APP & DB
 // ==========================
 const app = express();
-connectDB();
 
 // ==========================
 // ⚙️ SECURITY & CORE MIDDLEWARE
