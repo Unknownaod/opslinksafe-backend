@@ -145,11 +145,15 @@ authRoutes.post("/bootstrap", validateBody(bootstrapSchema), async (req, res, ne
 // =======================================
 authRoutes.get("/me", authRequired, async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.sub)
+    // ✅ Use req.user.id (set by middleware)
+    const user = await User.findById(req.user.id)
       .populate("agency")
       .select("-passwordHash");
 
-    if (!user) throw unauthorized("User not found");
+    if (!user) {
+      console.warn("❌ /me error: User not found for ID:", req.user.id);
+      return res.status(401).json({ ok: false, error: "User not found" });
+    }
 
     res.status(200).json({
       ok: true,
@@ -164,10 +168,10 @@ authRoutes.get("/me", authRequired, async (req, res, next) => {
           ? {
               id: user.agency._id,
               name: user.agency.name,
-              code: user.agency.code
+              code: user.agency.code,
             }
-          : null
-      }
+          : null,
+      },
     });
   } catch (err) {
     console.error("❌ /me error:", err.message);
