@@ -65,7 +65,7 @@ if (fs.existsSync(modelsPath)) {
 // ==========================
 const routes = [
   { path: "/api/auth", file: "./routes/authRoutes.js" },
-  { path: "/api/incidents", file: "./routes/IncidentRoutes.js" },
+  { path: "/api/incidents", file: "./routes/incidentRoutes.js" }, // 🔻 lowercase "i"
   { path: "/api/units", file: "./routes/unitRoutes.js" },
   { path: "/api/activity", file: "./routes/activityRoutes.js" },
   { path: "/api/health", file: "./routes/healthRoutes.js" },
