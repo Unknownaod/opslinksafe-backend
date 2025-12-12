@@ -5,74 +5,76 @@ import { User } from "../models/User.js";
 /**
  * Middleware: authRequired
  * ------------------------------------------
- * Verifies JWT, ensures user is active, and attaches
- * the full user context to req.user for downstream routes.
+ * Validates JWT from Authorization header,
+ * ensures the user and agency exist and are active,
+ * and attaches a sanitized user context to req.user.
  */
 export async function authRequired(req, res, next) {
+  const logPrefix = `🔹 [AUTH] [${new Date().toISOString()}]`;
+
   try {
     const header = req.headers.authorization;
+    console.log(`${logPrefix} Incoming Authorization:`, header || "❌ none");
 
-    // 🔍 Debug incoming header
-    console.log("🔹 [AUTH] Incoming Authorization:", header || "❌ none");
-
-    // 🔒 Check for Bearer token
+    // 1️⃣ Require a Bearer token
     if (!header || !header.startsWith("Bearer ")) {
-      console.warn("⚠️ Missing or invalid Authorization header");
-      throw unauthorized("Missing or invalid token");
+      console.warn(`${logPrefix} Missing or invalid Authorization header.`);
+      return next(unauthorized("Missing or invalid token"));
     }
 
-    // ✉️ Extract and verify token
+    // 2️⃣ Verify JWT
     const token = header.slice(7);
     let payload;
     try {
       payload = verifyJwt(token);
-      console.log("🧩 [AUTH] Decoded JWT payload:", payload);
+      console.log(`${logPrefix} Decoded JWT payload:`, payload);
     } catch (verifyErr) {
-      console.error("❌ [AUTH] JWT verification failed:", verifyErr.message);
-      throw unauthorized("Invalid or expired session");
+      console.error(`${logPrefix} JWT verification failed:`, verifyErr.message);
+      return next(unauthorized("Invalid or expired session"));
     }
 
-    // 🧠 Check for subject ID
     if (!payload?.sub) {
-      console.warn("⚠️ [AUTH] JWT missing 'sub' field or malformed payload:", payload);
-      throw unauthorized("Malformed token");
+      console.warn(`${logPrefix} Malformed JWT payload (missing sub):`, payload);
+      return next(unauthorized("Malformed token"));
     }
 
-    // 👤 Fetch user and their agency
+    // 3️⃣ Fetch user from DB
     const user = await User.findById(payload.sub).populate("agency");
-    console.log("👤 [AUTH] Fetched user:", user ? user.username : "❌ not found");
-
     if (!user) {
-      console.warn("⚠️ [AUTH] No user found for token sub:", payload.sub);
-      throw unauthorized("User not found");
+      console.warn(`${logPrefix} User not found for sub:`, payload.sub);
+      return next(unauthorized("User not found"));
     }
 
     if (!user.active) {
-      console.warn("⚠️ [AUTH] Inactive account:", user.username);
-      throw unauthorized("Account disabled");
+      console.warn(`${logPrefix} Inactive account:`, user.username);
+      return next(unauthorized("Account disabled"));
     }
 
     if (!user.agency) {
-      console.warn("⚠️ [AUTH] Missing agency link for:", user.username);
-      throw unauthorized("Agency not found");
+      console.warn(`${logPrefix} Missing agency link for:`, user.username);
+      return next(unauthorized("Agency not found"));
     }
 
-    // ✅ Attach minimal context to request for downstream use
+    // 4️⃣ Attach safe user context
     req.user = {
       id: user._id.toString(),
       username: user.username,
       role: user.role,
+      displayName: user.displayName || null,
       agencyId: user.agency._id.toString(),
       agencyCode: user.agency.code,
       agencyName: user.agency.name,
-      displayName: user.displayName || null,
     };
 
-    console.log("✅ [AUTH] Authenticated as:", req.user.username, "(", req.user.role, ")");
-    next();
+    console.log(
+      `${logPrefix} ✅ Authenticated: ${req.user.username} (${req.user.role}) from ${req.user.agencyCode}`
+    );
+
+    return next();
   } catch (err) {
-    console.error("❌ [AUTH] Middleware error:", err.message);
-    console.error("📜 [AUTH] Stack trace:", err.stack);
-    next(unauthorized("Invalid or expired session"));
+    console.error(`${logPrefix} ❌ Middleware exception:`, err.message);
+    console.error(`${logPrefix} Stack trace:`, err.stack);
+    // Only send one response
+    return next(unauthorized("Invalid or expired session"));
   }
 }
