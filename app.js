@@ -25,27 +25,27 @@ const app = express();
 // ==========================
 // ⚙️ SECURITY & CORE MIDDLEWARE
 // ==========================
-app.use(helmet({
-  crossOriginResourcePolicy: false, // needed if serving cross-domain assets
-}));
-
-// ✅ Comprehensive CORS — fixes the pending preflight issue
 app.use(
-  cors({
-    origin: [
-      "https://safe.opslinksystems.xyz", // production frontend
-      "http://localhost:5173",           // local dev
-    ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
+  helmet({
+    crossOriginResourcePolicy: false, // allows cross-domain assets
   })
 );
 
-// ✅ Explicitly respond to OPTIONS requests (important for CORS)
-app.options("*", cors());
+// ✅ Single unified CORS config — handles preflight automatically
+const corsOptions = {
+  origin: [
+    "https://safe.opslinksystems.xyz", // production frontend
+    "http://localhost:5173",           // local dev
+  ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
+// apply it once globally
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // for preflight
 
 // Core parsers and logging
 app.use(express.json({ limit: "10mb" }));
