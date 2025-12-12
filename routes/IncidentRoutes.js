@@ -11,7 +11,7 @@ import { badRequest, notFound } from "../utils/httpErrors.js";
 
 export const incidentRoutes = Router();
 
-// Schemas
+// Schema for creating an incident
 const createIncidentSchema = z.object({
   incidentId: z.string().min(3),
   type: z.string().min(2),
@@ -21,15 +21,15 @@ const createIncidentSchema = z.object({
   lng: z.number().optional()
 });
 
+// ✅ Create new incident
 incidentRoutes.post(
-  "/incidents",
+  "/", // was "/incidents"
   authRequired,
   requireRole("DISPATCHER", "SUPERVISOR", "ADMIN"),
   validateBody(createIncidentSchema),
   async (req, res, next) => {
     try {
       const { incidentId, type, priority, address, lat, lng } = req.validatedBody;
-
       const existing = await Incident.findOne({
         agency: req.user.agencyId,
         incidentId
@@ -44,13 +44,7 @@ incidentRoutes.post(
         location: { address, lat, lng },
         openedBy: req.user.id,
         status: "NEW",
-        timeline: [
-          {
-            status: "NEW",
-            message: "Incident created",
-            user: req.user.id
-          }
-        ]
+        timeline: [{ status: "NEW", message: "Incident created", user: req.user.id }]
       });
 
       await ActivityLog.create({
@@ -69,13 +63,13 @@ incidentRoutes.post(
   }
 );
 
-// assign units
+// ✅ Assign units
 const assignUnitsSchema = z.object({
   units: z.array(z.string().min(1)).min(1)
 });
 
 incidentRoutes.post(
-  "/incidents/:id/assign",
+  "/:id/assign",
   authRequired,
   requireRole("DISPATCHER", "SUPERVISOR", "ADMIN"),
   validateBody(assignUnitsSchema),
@@ -88,17 +82,14 @@ incidentRoutes.post(
       if (!incident) throw notFound("Incident not found");
 
       const before = incident.toObject();
-
       const { units: unitIds } = req.validatedBody;
 
-      // verify units exist & belong to the agency
       const units = await Unit.find({
         agency: req.user.agencyId,
         unitId: { $in: unitIds }
       });
 
       const validIds = units.map((u) => u.unitId);
-
       incident.unitsAssigned = Array.from(new Set([...incident.unitsAssigned, ...validIds]));
       if (incident.status === "NEW") incident.status = "DISPATCHED";
 
@@ -109,8 +100,6 @@ incidentRoutes.post(
       });
 
       await incident.save();
-
-      // set unit states
       await Unit.updateMany(
         { agency: req.user.agencyId, unitId: { $in: validIds } },
         { $set: { status: "DISPATCHED", currentIncidentId: incident.incidentId } }
@@ -144,13 +133,13 @@ incidentRoutes.post(
   }
 );
 
-// update status (NEW → DISPATCHED → EN_ROUTE → ON_SCENE → CLEARED)
+// ✅ Update status
 const statusSchema = z.object({
   status: z.enum(["NEW", "DISPATCHED", "EN_ROUTE", "ON_SCENE", "CLEARED", "CANCELLED"])
 });
 
 incidentRoutes.post(
-  "/incidents/:id/status",
+  "/:id/status",
   authRequired,
   requireRole("DISPATCHER", "SUPERVISOR", "ADMIN"),
   validateBody(statusSchema),
@@ -164,8 +153,8 @@ incidentRoutes.post(
 
       const before = incident.toObject();
       const { status } = req.validatedBody;
-
       incident.status = status;
+
       incident.timeline.push({
         status,
         message: `Status set to ${status}`,
@@ -202,9 +191,9 @@ incidentRoutes.post(
   }
 );
 
-// list incidents for dashboard/dispatch
+// ✅ List incidents
 incidentRoutes.get(
-  "/incidents",
+  "/",
   authRequired,
   async (req, res, next) => {
     try {
