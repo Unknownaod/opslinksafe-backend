@@ -4,6 +4,7 @@ const agencySchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     code: { type: String, required: true, unique: true }, // e.g. "HILLSFIRE"
+    supervisorPassword: { type: String, default: "Supervisor123!" },
     timezone: { type: String, default: "America/Toronto" },
     settings: {
       responsePlans: {
