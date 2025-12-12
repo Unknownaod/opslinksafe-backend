@@ -11,11 +11,20 @@ import { notFound, badRequest } from "../utils/httpErrors.js";
 export const unitRoutes = Router();
 
 const statusSchema = z.object({
-  status: z.enum(["AVAILABLE", "DISPATCHED", "EN_ROUTE", "ON_SCENE", "TRANSPORT", "CLEAR", "OUT_OF_SERVICE"])
+  status: z.enum([
+    "AVAILABLE",
+    "DISPATCHED",
+    "EN_ROUTE",
+    "ON_SCENE",
+    "TRANSPORT",
+    "CLEAR",
+    "OUT_OF_SERVICE"
+  ])
 });
 
+// ✅ Update unit status
 unitRoutes.post(
-  "/units/:unitId/status",
+  "/:unitId/status",
   authRequired,
   requireRole("FIELD", "DISPATCHER", "SUPERVISOR", "ADMIN"),
   validateBody(statusSchema),
@@ -30,19 +39,25 @@ unitRoutes.post(
       const before = unit.toObject();
       const { status } = req.validatedBody;
 
-      // basic guard (no weird jumps)
-      const allowedTransitions = new Set([
-        "AVAILABLE", "DISPATCHED", "EN_ROUTE", "ON_SCENE", "TRANSPORT", "CLEAR", "OUT_OF_SERVICE"
-      ]);
-      if (!allowedTransitions.has(status)) throw badRequest("Invalid status");
+      if (
+        ![
+          "AVAILABLE",
+          "DISPATCHED",
+          "EN_ROUTE",
+          "ON_SCENE",
+          "TRANSPORT",
+          "CLEAR",
+          "OUT_OF_SERVICE"
+        ].includes(status)
+      )
+        throw badRequest("Invalid status");
 
       unit.status = status;
-      if (status === "AVAILABLE" || status === "OUT_OF_SERVICE" || status === "CLEAR") {
+      if (["AVAILABLE", "OUT_OF_SERVICE", "CLEAR"].includes(status)) {
         unit.currentIncidentId = null;
       }
       unit.location = unit.location || {};
       unit.location.lastUpdate = new Date();
-
       await unit.save();
 
       await ActivityLog.create({
@@ -73,9 +88,9 @@ unitRoutes.post(
   }
 );
 
-// list units for boards
+// ✅ List units
 unitRoutes.get(
-  "/units",
+  "/",
   authRequired,
   async (req, res, next) => {
     try {
