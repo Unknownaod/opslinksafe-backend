@@ -25,26 +25,39 @@ const app = express();
 // ==========================
 // ⚙️ SECURITY & CORE MIDDLEWARE
 // ==========================
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: false, // needed if serving cross-domain assets
+}));
+
+// ✅ Comprehensive CORS — fixes the pending preflight issue
 app.use(
   cors({
     origin: [
-      "https://safe.opslinksystems.xyz", // frontend domain
+      "https://safe.opslinksystems.xyz", // production frontend
       "http://localhost:5173",           // local dev
     ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 );
-app.use(express.json({ limit: "5mb" }));
+
+// ✅ Explicitly respond to OPTIONS requests (important for CORS)
+app.options("*", cors());
+
+// Core parsers and logging
+app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("combined"));
 
 // ==========================
-// 🚦 RATE LIMITING
+// 🚦 RATE LIMITING (Anti-DDoS)
 // ==========================
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 120,
+  max: 120, // per IP
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -68,7 +81,7 @@ if (fs.existsSync(modelsPath)) {
 }
 
 // ==========================
-// 🚑 ROUTES
+// 🚑 ROUTES REGISTRATION
 // ==========================
 const routes = [
   { path: "/api/auth", file: "./routes/authRoutes.js" },
@@ -76,7 +89,7 @@ const routes = [
   { path: "/api/units", file: "./routes/unitRoutes.js" },
   { path: "/api/activity", file: "./routes/activityRoutes.js" },
   { path: "/api/health", file: "./routes/healthRoutes.js" },
-  { path: "/api/agency", file: "./routes/agencyRoutes.js" }, // 🟦 ADDED
+  { path: "/api/agency", file: "./routes/agencyRoutes.js" },
 ];
 
 for (const r of routes) {
@@ -98,7 +111,20 @@ for (const r of routes) {
 // 🩺 HEALTH CHECK
 // ==========================
 app.get("/", (req, res) => {
-  res.json({ ok: true, service: "OpsLink SAFE Backend", status: "online" });
+  res.json({
+    ok: true,
+    service: "OpsLink SAFE Backend",
+    status: "online",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ==========================
+// 🛡️ FALLBACK LOGGING FOR UNKNOWN PATHS
+// ==========================
+app.all("*", (req, res) => {
+  console.warn(`⚠️ Unknown route accessed: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ ok: false, error: "Route not found", path: req.originalUrl });
 });
 
 // ==========================
