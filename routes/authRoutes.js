@@ -1,3 +1,4 @@
+// routes/authRoutes.js
 import { Router } from "express";
 import { z } from "zod";
 import mongoose from "mongoose";
@@ -10,12 +11,12 @@ import { badRequest, unauthorized } from "../utils/httpErrors.js";
 
 export const authRoutes = Router();
 
-// =======================================
-// 🧩 Zod Schemas
-// =======================================
+/* =======================================
+   🧩 Validation Schemas
+======================================= */
 const loginSchema = z.object({
   username: z.string().min(2, "Username must be at least 2 characters."),
-  password: z.string().min(6, "Password must be at least 6 characters.")
+  password: z.string().min(3, "Password must be at least 3 characters."),
 });
 
 const bootstrapSchema = z.object({
@@ -23,45 +24,46 @@ const bootstrapSchema = z.object({
   agencyCode: z.string().min(2),
   username: z.string().min(2),
   displayName: z.string().min(2),
-  password: z.string().min(8)
+  password: z.string().min(6),
 });
 
-// =======================================
-// 🔐 LOGIN ROUTE
-// =======================================
+/* =======================================
+   🔐 LOGIN
+======================================= */
 authRoutes.post("/login", validateBody(loginSchema), async (req, res, next) => {
   try {
     const { username, password } = req.validatedBody;
     console.log("🟦 Login attempt:", username);
+    console.log("✅ MongoDB connection:", mongoose.connection.name);
 
-    // Debug connection state
-    console.log("✅ MongoDB:", mongoose.connection.name);
-
-    // Fetch user with agency relationship
+    // Find user and agency
     const user = await User.findOne({ username }).populate("agency");
     if (!user) {
       console.warn("⚠️ No user found for username:", username);
-      throw unauthorized("Invalid credentials");
+      return next(unauthorized("Invalid credentials"));
     }
 
-    // Check password
+    // Compare password
     const ok = await comparePassword(password, user.passwordHash);
     console.log("🔐 Password match result:", ok);
 
     if (!ok || !user.active) {
-      console.warn(`⚠️ Invalid credentials or inactive account: ${username}`);
-      throw unauthorized("Invalid credentials");
+      console.warn("⚠️ Invalid password or inactive account:", username);
+      return next(unauthorized("Invalid credentials"));
     }
 
-    // Create signed JWT token
-    const token = signJwt({
+    // Create JWT
+    const tokenPayload = {
       sub: user._id.toString(),
       role: user.role,
-      agencyId: user.agency?._id?.toString()
-    });
+      agencyId: user.agency?._id?.toString(),
+      username: user.username,
+    };
+    const token = signJwt(tokenPayload);
 
-    // Respond with user info
-    return res.status(200).json({
+    console.log("🪪 Signed JWT:", tokenPayload);
+
+    res.status(200).json({
       ok: true,
       message: "✅ Login successful",
       token,
@@ -74,39 +76,42 @@ authRoutes.post("/login", validateBody(loginSchema), async (req, res, next) => {
           ? {
               id: user.agency._id,
               name: user.agency.name,
-              code: user.agency.code
+              code: user.agency.code,
             }
-          : null
-      }
+          : null,
+      },
     });
   } catch (err) {
-    console.error("❌ Login error:", err.message);
+    console.error("❌ Login route error:", err);
     next(err);
   }
 });
 
-// =======================================
-// 🧱 BOOTSTRAP ADMIN ROUTE (DEV ONLY)
-// =======================================
+/* =======================================
+   🧱 BOOTSTRAP ADMIN (DEV ONLY)
+======================================= */
 authRoutes.post("/bootstrap", validateBody(bootstrapSchema), async (req, res, next) => {
   try {
     if (process.env.NODE_ENV === "production") {
-      throw badRequest("Bootstrap disabled in production");
+      return next(badRequest("Bootstrap disabled in production"));
     }
 
     const { agencyName, agencyCode, username, displayName, password } = req.validatedBody;
-    console.log("🧱 Bootstrapping new agency:", agencyCode);
 
-    // Ensure agency exists or create it
+    console.log("🧱 Bootstrapping agency:", agencyCode);
+
     let agency = await Agency.findOne({ code: agencyCode });
     if (!agency) {
-      agency = await Agency.create({ name: agencyName, code: agencyCode });
+      agency = await Agency.create({
+        name: agencyName,
+        code: agencyCode,
+        supervisorPassword: "opslink", // default supervisor key
+      });
       console.log("🏢 Created new agency:", agency.name);
     }
 
-    // Prevent duplicate users
-    const existingUser = await User.findOne({ username });
-    if (existingUser) throw badRequest("Username already exists");
+    const existing = await User.findOne({ username });
+    if (existing) return next(badRequest("Username already exists"));
 
     const passwordHash = await hashPassword(password);
 
@@ -116,7 +121,7 @@ authRoutes.post("/bootstrap", validateBody(bootstrapSchema), async (req, res, ne
       displayName,
       passwordHash,
       role: "ADMIN",
-      active: true
+      active: true,
     });
 
     return res.status(201).json({
@@ -125,33 +130,34 @@ authRoutes.post("/bootstrap", validateBody(bootstrapSchema), async (req, res, ne
       agency: {
         id: agency._id,
         name: agency.name,
-        code: agency.code
+        code: agency.code,
       },
       user: {
         id: user._id,
         username: user.username,
         displayName: user.displayName,
-        role: user.role
-      }
+        role: user.role,
+      },
     });
   } catch (err) {
-    console.error("❌ Bootstrap error:", err.message);
+    console.error("❌ Bootstrap error:", err);
     next(err);
   }
 });
 
-// =======================================
-// 👤 CURRENT USER (/me)
-// =======================================
+/* =======================================
+   👤 CURRENT USER (/me)
+======================================= */
 authRoutes.get("/me", authRequired, async (req, res, next) => {
   try {
-    // ✅ Use req.user.id (set by middleware)
+    console.log("🧭 /me request from:", req.user.username);
+
     const user = await User.findById(req.user.id)
       .populate("agency")
       .select("-passwordHash");
 
     if (!user) {
-      console.warn("❌ /me error: User not found for ID:", req.user.id);
+      console.warn("⚠️ /me user not found:", req.user.id);
       return res.status(401).json({ ok: false, error: "User not found" });
     }
 
@@ -174,7 +180,7 @@ authRoutes.get("/me", authRequired, async (req, res, next) => {
       },
     });
   } catch (err) {
-    console.error("❌ /me error:", err.message);
+    console.error("❌ /me route error:", err);
     next(err);
   }
 });
