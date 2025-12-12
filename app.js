@@ -44,7 +44,7 @@ app.use(morgan("combined"));
 // ==========================
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 120, // 120 requests per minute per IP
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -72,10 +72,11 @@ if (fs.existsSync(modelsPath)) {
 // ==========================
 const routes = [
   { path: "/api/auth", file: "./routes/authRoutes.js" },
-  { path: "/api/incidents", file: "./routes/incidentRoutes.js" }, // ✅ lowercase + base path
+  { path: "/api/incidents", file: "./routes/incidentRoutes.js" },
   { path: "/api/units", file: "./routes/unitRoutes.js" },
   { path: "/api/activity", file: "./routes/activityRoutes.js" },
   { path: "/api/health", file: "./routes/healthRoutes.js" },
+  { path: "/api/agency", file: "./routes/agencyRoutes.js" }, // 🟦 ADDED
 ];
 
 for (const r of routes) {
